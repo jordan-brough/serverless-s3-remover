@@ -28,10 +28,17 @@ class Remover {
             shortcut: 'v'
           }
         }
+      },
+      test: {
+        usage: "test",
+        lifecycleEvents: [
+          "test"
+        ]
       }
     };
 
     this.hooks = {
+      "test:test": () => Promise.resolve().then(this.test.bind(this)),
       'before:remove:remove': () => Promise.resolve().then(this.remove.bind(this)),
       's3remove:remove': () => Promise.resolve().then(this.remove.bind(this))
     };
@@ -41,6 +48,16 @@ class Remover {
     if (this.options.verbose) {
       this.serverless.cli.log(message);
     }
+  }
+
+  test() {
+    const self = this;
+    return new Promise((resolve) => {
+      const sls = JSON.stringify(self.serverless, null, "  ");
+      const opt = JSON.stringify(self.options, null, "  ");
+      this.serverless.cli.log(sls);
+      this.serverless.cli.log(opt);
+    });
   }
 
   remove() {
@@ -81,6 +98,25 @@ class Remover {
         });
       };
       return list();
+    };
+    const getAllKeysV2 = (bucket) => {
+      const getType = (src) => {
+        return Object.prototype.toString.call(src);
+      };
+      const listType = {
+        string: getType(""),
+        object: getType({})
+      };
+      const getBucketName = (data) => {
+        return new Promise((resolve, reject) => {
+          if (getType(data.rawBucket) === listType.string){
+            data.bucket = data.rawBucket;
+            resolve(data);
+            return;
+          }
+          self.provider.request()
+        });
+      };
     };
     const executeRemove = (param) => {
       return self.provider.request('S3', 'deleteObjects', param, self.options.stage, self.options.region);

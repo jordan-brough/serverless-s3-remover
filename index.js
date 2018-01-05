@@ -107,12 +107,23 @@ class Remover {
         string: getType(""),
         object: getType({})
       };
+      const getStackName = () => {
+        let stage = self.serverless.service.provider.stage;
+        if (self.options.stage != null) {
+          stage = self.options.stage;
+        }
+        return `${self.serverless.service.service}-${stage}`;
+      };
       const getBucketName = (data) => {
         return new Promise((resolve, reject) => {
           if (getType(data.rawBucket) === listType.string){
             data.bucket = data.rawBucket;
             resolve(data);
             return;
+          }
+          const ref = data.rawBucket.Ref;
+          const params = {
+            StackName: getStackName(),
           }
           self.provider.request()
         });

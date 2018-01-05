@@ -186,6 +186,80 @@ class Remover {
       });
     });
   }
+  removeV2() {
+    const self = this;
+    const buckets = self.config.buckets;
+
+    const getType = (src) => {
+      return Object.prototype.toString.call(src);
+    };
+    const listType = {
+      string: getType(""),
+      object: getType({})
+    };
+
+    const getStackName = () => {
+      let stage = self.serverless.service.provider.stage;
+      if (self.options.stage != null) {
+        stage = self.options.stage;
+      }
+      return `${self.serverless.service.service}-${stage}`;
+    }
+    const getBucketName = (data) => {
+      return new Promise((resolve, reject) => {
+        const rawBucket = data.rawBucket;
+        if (getType(rawBucket) === listType.string) {
+          data.bucket = rawBucket;
+          resolve(data);
+          return;
+        }
+        const ref = rawBucket.Ref;
+        if (getType(ref) !== listType.string) {
+          reject(new Error("illegal data"));
+          return;
+        }
+        self.provider.request("CloudFormation", 'describeStackResource', {
+          LogicalResourceId: ref,
+          StackName: getStackName()
+        }, param, self.options.stage, self.options.region).then((res) => {
+          data.bucket = res.StackResourceDetail.PhysicalResourceId;
+          resolve(data);
+        }).catch((err) => {
+          reject(err);
+        });
+      });
+    };
+    const getKeys = (param) => {
+      const parseKey = (item) => {
+        return item.Key;
+      };
+      const get = (data) => {
+        return new Promise((resolve, reject) => {
+          self.provider.request("S3", "listObjectsV2", data, self.options.stage, self.options.region).then((res) => {
+            const contents = res.Contents;
+            const keys = contents.map(parseKey);
+            const token = res.NextContinuationToken;
+            if (token == null) {
+              resolve(keys);
+            } else {
+              data.ContinuationToken = token;
+              Promise.resolve(data).then(get).then((res2) => {
+                const result = [].concat(keys, res2);
+                resolve(result);
+              }).catch((err) => {
+                reject(err);
+              });
+            }
+          }).catch((err) => {
+            reject(err);
+          });
+        });
+      };
+      Promise.resolve({
+        Bucket: param.bucket
+      })
+    };
+  }
 }
 
 module.exports = Remover;
